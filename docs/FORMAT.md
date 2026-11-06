@@ -164,16 +164,16 @@ query User($id: ID!) { user(id: $id) { id name } }
 ```
 GRPC {{grpcHost}}/users.v1.UserService/GetUser
 
-[proto]
-reflection = true
-
-[metadata]
-authorization = Bearer {{accessToken}}
-
 [message default]
 ~~~json
 { "id": "{{userId}}" }
 ~~~
+
+[metadata]
+authorization = Bearer {{accessToken}}
+
+[proto]
+reflection = true
 ```
 
 ```
@@ -188,7 +188,7 @@ Sec-WebSocket-Protocol: chat
 
 ## 5. 集合根与文件夹
 
-`_collection.postgo` 和 `_folder.postgo` 没有请求行，所以 headers 写在 `[headers]` 段里（只有这两种文件用这个段）。其他可用的段：`[auth …]`、`[vars]`、`[script …]`、`[settings]`、`[order]`、`[docs]`。这些配置由下层继承：headers 和 vars 逐层合并，下层覆盖上层；auth 和 settings 由下层覆盖；scripts 按 集合 → 文件夹 → 请求 的顺序依次执行。
+`_collection.postgo` 和 `_folder.postgo` 没有请求行，所以 headers 写在 `[headers]` 段里（只有这两种文件用这个段），每行的写法和请求里的 headers 一样，是 `Name: value`。其他可用的段：`[auth …]`、`[vars]`、`[script …]`、`[settings]`、`[order]`、`[docs]`。这些配置由下层继承：headers 和 vars 逐层合并，下层覆盖上层；auth 和 settings 由下层覆盖；scripts 按 集合 → 文件夹 → 请求 的顺序依次执行。
 
 集合根文件额外有一个必需的段落：
 
