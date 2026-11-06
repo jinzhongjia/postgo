@@ -283,6 +283,9 @@ P1 只能通过 C11 的扩展点和 C13 的 importer 注册表接入，**不修�
 |---|---|---|
 | C1 model | 已实现，测试覆盖率 99.4%，**已冻结**（2026-11-06），之后只允许新增字段 | `core/model` |
 | C4 secrets | 已实现，测试覆盖率 94.4%（mygo.Secrets 适配器由 U1 提供） | `core/secrets` |
+| C2 store | 已实现：`pgfile` 覆盖率 98.6%（字节级往返、规范输出、改动后写回三条性质都经过 fuzz 验证），`store` 覆盖率 93.5% | `core/store`、`core/store/pgfile` |
+| C3 vars | 已实现，测试覆盖率 99.7%，内置 51 个动态变量 | `core/vars` |
+| C5 storage | 已实现，测试覆盖率 97.3%；10 万条历史下最慢的查询为 13.6 ms | `core/storage` |
 | — | 模块路径 `github.com/jinzhongjia/postgo` | `go.mod` |
 | CI | 三平台测试 + 六个目标的交叉编译 + 依赖检查 | `.github/workflows/ci.yml`、`tools/checkdeps` |
 

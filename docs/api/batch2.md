@@ -2,6 +2,8 @@
 
 > 状态：**已冻结**（2026-11-06 评审通过）。
 > 下面的 Go 代码是对外 API 的签名，不是实现。
+>
+> 实现时只在冻结的接口之上**新增**了以下内容，没有修改任何已有签名：`Store.Dir`、`Store.LocalOverrides`、`ErrExists`、`ErrNotEmpty`、`ValidationError`、`EventKind.String`，`Scope.Names`、`Result.HasErrors`，以及 `storage.ErrNotFound`、`DB.MaxBody`。
 
 ---
 

@@ -757,7 +757,41 @@ func FuzzRequest(f *testing.F) {
 		if out := WriteRequest(r2, o2); string(out) != string(canon) {
 			t.Fatalf("canonical round trip %q gave %q", canon, out)
 		}
+		// Edited and written over the file, the request reads back as
+		// edited.
+		for i, edit := range edits {
+			e := r.Clone()
+			edit(e)
+			out := WriteRequest(e, o)
+			got, _, err := ReadRequest("f.postgo", out)
+			if err != nil {
+				t.Fatalf("edit %d of %q wrote %q, which does not read: %v", i, src, out, err)
+			}
+			if !reflect.DeepEqual(got, e) {
+				t.Fatalf("edit %d of %q wrote %q, which reads as\n%+v\nnot\n%+v", i, src, out, got, e)
+			}
+		}
 	})
+}
+
+// edits change requests in the ways the UI does.
+var edits = []func(*model.Request){
+	func(r *model.Request) { r.Headers = append(r.Headers, model.KV{Key: "X-New", Value: "1"}) },
+	func(r *model.Request) { r.Headers = nil },
+	func(r *model.Request) { r.Name = "Renamed" },
+	func(r *model.Request) { r.Name, r.Tags = "", nil },
+	func(r *model.Request) { r.Docs = "new docs" },
+	func(r *model.Request) { r.Query = append([]model.KV{{Key: "first", Value: "1"}}, r.Query...) },
+	func(r *model.Request) { r.Query, r.Path, r.Vars, r.Metadata = nil, nil, nil, nil },
+	func(r *model.Request) { r.Body = model.Body{Type: model.BodyText, Raw: "~~~\nbody"} },
+	func(r *model.Request) {
+		r.Auth = model.Auth{Type: model.AuthBasic, Basic: model.BasicAuth{Username: "u"}}
+	},
+	func(r *model.Request) { r.Auth = model.Auth{Type: model.AuthInherit} },
+	func(r *model.Request) { r.Settings = model.Settings{Timeout: model.Some(time.Second)} },
+	func(r *model.Request) { r.Scripts = model.Scripts{Tests: "test()"} },
+	func(r *model.Request) { r.Asserts = append(r.Asserts, model.Assert{Expr: "res.status == 200"}) },
+	func(r *model.Request) { r.Examples = nil; r.Messages = nil },
 }
 
 func FuzzEnvironment(f *testing.F) {

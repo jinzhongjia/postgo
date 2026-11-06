@@ -396,10 +396,16 @@ func write(h *head, specs []spec, o *Origin) []byte {
 		}
 		items = slices.Insert(items, at, item{rank: i, fresh: true, spec: &specs[i]})
 	}
+	freshBefore := false
 	for _, it := range items {
 		switch {
 		case it.fresh && w.b.Len() == 0:
 		case it.fresh:
+			w.endLine()
+			w.line("")
+		case it.gap == "" && freshBefore:
+			// The file's first section, which had nothing before it, now
+			// follows another.
 			w.endLine()
 			w.line("")
 		default:
@@ -411,6 +417,7 @@ func write(h *head, specs []spec, o *Origin) []byte {
 		} else {
 			w.raw(it.raw)
 		}
+		freshBefore = freshBefore || it.fresh
 	}
 	if d.tail != "" {
 		w.endLine()
