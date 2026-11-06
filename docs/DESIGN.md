@@ -149,7 +149,7 @@ cmd/postgo-cli   复用 core，用于 CI（JUnit/JSON 报告），以及 `postgo
 定义在 `core/model`（C1），以代码为准：`Request`、`Body`、`Auth`（11 种认证方式各自的字段）、`Settings`（`Opt[T]`，未设置即继承）、`Config`、`Folder` / `Node`、`Collection`、`Environment`。另外提供 `Validate()`，返回带字段路径、严重级别（Error / Warning）和规则代码的问题列表；以及 `Clone()` 深拷贝。
 
 变量作用域，后者覆盖前者：
-`Global < Collection < Environment < Folder（链） < Data（Runner 迭代） < Local（脚本设置的）`
+`Global < Collection < Environment < Folder（链） < Request < Data（Runner 迭代） < Local（脚本设置的）`
 
 ### 3.3 文件格式：自定义 `.postgo` 文本格式
 
