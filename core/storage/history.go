@@ -5,6 +5,7 @@ import (
 	"errors"
 	"strings"
 	"time"
+	"unicode/utf8"
 )
 
 // Source is who sent a request.
@@ -67,9 +68,17 @@ func (q HistoryQuery) where() (string, []any) {
 		add("request_id = ?", q.RequestID)
 	}
 	if q.Text != "" {
-		esc := strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`).Replace(q.Text)
-		conds = append(conds, `(method || ' ' || url) LIKE ? ESCAPE '\'`)
-		args = append(args, "%"+esc+"%")
+		// The trigram index finds any substring of 3 runes or more, the
+		// shortest it can index. Shorter texts scan, which is cheap over
+		// the few rows they can match.
+		if utf8.RuneCountInString(q.Text) >= 3 {
+			conds = append(conds, `id IN (SELECT rowid FROM history_text WHERE history_text MATCH ?)`)
+			args = append(args, `"`+strings.ReplaceAll(q.Text, `"`, `""`)+`"`)
+		} else {
+			esc := strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`).Replace(q.Text)
+			conds = append(conds, `(method || ' ' || url) LIKE ? ESCAPE '\'`)
+			args = append(args, "%"+esc+"%")
+		}
 	}
 	if q.Source != SourceAny {
 		add("source = ?", int(q.Source))

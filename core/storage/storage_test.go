@@ -551,3 +551,87 @@ func TestConcurrentJar(t *testing.T) {
 		t.Errorf("%d cookies", len(all))
 	}
 }
+
+func TestHistoryTextSearch(t *testing.T) {
+	d, _ := open(t)
+	add := func(method, url string) int64 {
+		t.Helper()
+		id, err := d.AddHistory(Entry{CollectionID: "c", Method: method, URL: url}, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return id
+	}
+	a := add("GET", `https://api.example.com/items/9999?q="x"`)
+	b := add("PATCH", "https://api.example.com/USERS/alpha")
+	c := add("DELETE", "https://api.example.com/items/1000")
+
+	got := func(text string) []int64 {
+		t.Helper()
+		es, err := d.History(HistoryQuery{Text: text})
+		if err != nil {
+			t.Fatalf("search %q: %v", text, err)
+		}
+		var out []int64
+		for _, e := range es {
+			out = append(out, e.ID)
+		}
+		return out
+	}
+	checks := []struct {
+		text string
+		want []int64
+	}{
+		{"items/9999", []int64{a}},        // a substring that is not a token
+		{"example.com/USERS", []int64{b}}, // case is ignored
+		{`q="x"`, []int64{a}},             // an FTS5 query syntax character is literal
+		{"i", []int64{c, b, a}},           // shorter than a trigram: scans
+		{"nothing", nil},
+	}
+	for _, ch := range checks {
+		if got := got(ch.text); !reflect.DeepEqual(got, ch.want) {
+			t.Errorf("Text %q = %v, want %v", ch.text, got, ch.want)
+		}
+	}
+
+	// The index follows updates and deletes.
+	if err := d.RenameRequest("c", "", ""); err != nil {
+		t.Fatal(err)
+	}
+	if n, err := d.DeleteHistory(HistoryQuery{RequestID: ""}); err != nil || n != 3 {
+		t.Fatalf("DeleteHistory = %d %v", n, err)
+	}
+	if got := got("items/9999"); got != nil {
+		t.Errorf("search after delete = %v", got)
+	}
+}
+
+func TestMigrationIndexesOldEntries(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "postgo.db")
+	db, err := sql.Open("sqlite", path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// A database as version 1 left it, with an entry already in it.
+	if _, err := db.Exec(migrations[0]); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`INSERT INTO history (time, collection_id, request_id, source, client, method, url, status, duration, size, err)
+		VALUES (1, 'c', 'r.postgo', 1, '', 'GET', 'https://api/items/42', 200, 0, 0, '')`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec("PRAGMA user_version = 1"); err != nil {
+		t.Fatal(err)
+	}
+	db.Close()
+
+	d, err := Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer d.Close()
+	es, err := d.History(HistoryQuery{Text: "items/42"})
+	if err != nil || len(es) != 1 {
+		t.Fatalf("entry added before the migration is not indexed: %v %v", es, err)
+	}
+}

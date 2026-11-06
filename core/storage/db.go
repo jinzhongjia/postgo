@@ -88,6 +88,28 @@ var migrations = []string{
 	CREATE INDEX audit_time ON audit (time);
 	CREATE TABLE settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
 	CREATE TABLE state (key TEXT PRIMARY KEY, value TEXT NOT NULL);`,
+
+	// Schema 2: the full-text index of history, and the indexes of the
+	// queries that filter by collection or source. The trigram tokenizer
+	// makes MATCH find any substring, as LIKE does, in time that does not
+	// grow with the table.
+	`CREATE VIRTUAL TABLE history_text USING fts5 (
+		method, url,
+		content = 'history', content_rowid = 'id', tokenize = 'trigram'
+	);
+	INSERT INTO history_text (rowid, method, url) SELECT id, method, url FROM history;
+	CREATE TRIGGER history_text_insert AFTER INSERT ON history BEGIN
+		INSERT INTO history_text (rowid, method, url) VALUES (new.id, new.method, new.url);
+	END;
+	CREATE TRIGGER history_text_delete AFTER DELETE ON history BEGIN
+		INSERT INTO history_text (history_text, rowid, method, url) VALUES ('delete', old.id, old.method, old.url);
+	END;
+	CREATE TRIGGER history_text_update AFTER UPDATE ON history BEGIN
+		INSERT INTO history_text (history_text, rowid, method, url) VALUES ('delete', old.id, old.method, old.url);
+		INSERT INTO history_text (rowid, method, url) VALUES (new.id, new.method, new.url);
+	END;
+	CREATE INDEX history_collection ON history (collection_id, id);
+	CREATE INDEX history_source ON history (source, id);`,
 }
 
 // Open opens the database at path, making it when there is none, and

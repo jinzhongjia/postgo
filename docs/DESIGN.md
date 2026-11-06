@@ -237,7 +237,7 @@ res.status == 201
 | C2 | **store** | `.postgo` 格式的解析器和写入器（手写，按 FORMAT.md 实现）：字节级往返、原始片段表、`format` 版本分派、未知段落原样保留、围栏自动选择；目录扫描、`[order]` 排序、新建/重命名/移动/删除（发出 Renamed 事件）、外部修改合并（通过 `Watcher` 接口，由 app 层注入）、冲突检测、`.postgo.local/` 覆盖层（只用于环境） | C1 | 往返测试：读入后原样写回，git diff 为零；fuzz 测试 `parse→write→parse` 结果一致且不会 panic；并发写入安全 |
 | C3 | **vars** | `{{var}}` 解析、完整作用域链、动态变量（`$uuid`、`$timestamp`、`$isoTimestamp`、`$randomInt`、`$random*` 全集）、嵌套引用、循环引用检测、未定义变量诊断（附带位置信息，供 UI 高亮）；**调用方可以传入 secret 解析策略**（按目标主机决定是否替换 secret，供 A1 使用），解析结果标记出哪些片段来自 secret，供遮蔽使用 | C1 | 每个 token 都返回带位置的诊断信息 |
 | C4 | **secrets** | 抽象接口 `SecretStore`。实现：mygo.Secrets 适配器（放在 app 层注入）、超过 2560 字节时用 AES-GCM 加密写文件、测试用的内存实现 | 无 | 接口在 core，具体实现由 app 层注入 |
-| C5 | **storage**（SQLite） | 用 `modernc.org/sqlite`（纯 Go，无 cgo）。不能用 mygo 的 `plugins/sqlite`，它会把整个 mygo 依赖进来，违反 core 不依赖 mygo 的约束，CLI 也会因此变重。功能：请求历史（记录来源 user/agent 和客户端名称；按"集合 ID + 请求路径"索引，订阅 Renamed 事件更新）（可搜索、可清理）、Cookie Jar（实现 `http.CookieJar`，持久化，可按域名查看和编辑）、响应缓存、UI 状态（打开的 tab、分栏比例） | C1 | 有 schema 迁移机制；10 万条历史下查询 < 50 ms |
+| C5 | **storage**（SQLite） | 用 `modernc.org/sqlite`（纯 Go，无 cgo）。不能用 mygo 的 `plugins/sqlite`，它会把整个 mygo 依赖进来，违反 core 不依赖 mygo 的约束，CLI 也会因此变重。功能：请求历史（记录来源 user/agent 和客户端名称；按"集合 ID + 请求路径"索引，订阅 Renamed 事件更新）（搜索用 FTS5 trigram 索引做子串匹配、可清理）、Cookie Jar（实现 `http.CookieJar`，持久化，可按域名查看和编辑）、响应缓存、UI 状态（打开的 tab、分栏比例） | C1 | 有 schema 迁移机制；10 万条历史下查询 < 50 ms（`-race` 下不测时间） |
 | C6 | **auth** | 全部认证方式：Inherit、Basic、Bearer、API Key（header 或 query）、Digest、OAuth 1.0、OAuth 2.0（授权码 + PKCE、Client Credentials、Password、Implicit、Refresh、自动续期、token 缓存）、AWS SigV4、NTLM、JWT 签发 | C1, C3, C4 | 每种方式都对照真实规范或测试服务器验证；OAuth 的回调通过 `Callback` 接口交给 app 层实现 |
 | C7 | **engine**（HTTP） | 发送请求的完整流水线：变量解析 → 认证 → 构建请求 → 发送 → 读取响应。包括 httptrace 计时（DNS / TCP / TLS / TTFB / 下载）、HTTP/1.1 和 HTTP/2（HTTP/3 可选）、代理（系统代理、手动、按主机）、TLS（关闭校验、自定义 CA、mTLS 客户端证书）、重定向策略、超时、取消、Cookie、解压（gzip / br / zstd）、响应体流式读取、大响应落临时文件、记录实际发出的请求原文；每次发送都可以带上下文选项（secret 解析策略、请求来源 user/agent，写入历史记录） | C1, C3, C5, C6 | 用 `httptest` 覆盖所有分支；取消后不泄漏 goroutine |
 | C8 | **realtime** | WebSocket（连接、收发、二进制、ping、子协议、自定义握手 header）、SSE（事件解析、自动重连、Last-Event-ID）、Socket.IO 可选；统一的消息流接口 `Stream` | C1, C3, C6 | 能稳定承受每秒 1 万条消息、不丢消息 |
@@ -285,7 +285,7 @@ P1 只能通过 C11 的扩展点和 C13 的 importer 注册表接入，**不修�
 | C4 secrets | 已实现，测试覆盖率 94.4%（mygo.Secrets 适配器由 U1 提供） | `core/secrets` |
 | C2 store | 已实现：`pgfile` 覆盖率 98.6%（字节级往返、规范输出、改动后写回三条性质都经过 fuzz 验证），`store` 覆盖率 93.5% | `core/store`、`core/store/pgfile` |
 | C3 vars | 已实现，测试覆盖率 99.7%，内置 51 个动态变量 | `core/vars` |
-| C5 storage | 已实现，测试覆盖率 97.3%；10 万条历史下最慢的查询为 13.6 ms | `core/storage` |
+| C5 storage | 已实现，测试覆盖率 97.3%；10 万条历史下最慢的查询为 2.6 ms（FTS5 trigram 子串索引） | `core/storage` |
 | — | 模块路径 `github.com/jinzhongjia/postgo` | `go.mod` |
 | CI | 三平台测试 + 六个目标的交叉编译 + 依赖检查 | `.github/workflows/ci.yml`、`tools/checkdeps` |
 

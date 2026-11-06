@@ -1,3 +1,8 @@
+//go:build !race
+
+// The race detector slows execution enough that the timings here mean
+// nothing; the budget is checked in the ordinary test job.
+
 package storage
 
 import (
